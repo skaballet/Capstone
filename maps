@@ -1,0 +1,91 @@
+rm(list=ls())
+Sys.time()
+
+# SARA MALARIA RESULTS
+# April 4, 2019
+
+Start.time <- Sys.time()
+
+#load libraries
+library(spatstat.data)
+library(spatstat.utils)
+require(rgdal)
+require(maptools)
+require(rgeos)
+library(plyr)
+library(ggplot2)
+library(gdata)
+library(foreign)
+options(width=120)
+
+# install.packages("readstata13")
+library(readstata13)
+
+#install.packages("RColorBrewer")
+library(RColorBrewer)
+
+# Administrative boundaries from FAO
+geo.name <- as.character("mozambique2015")
+path<-c("~/Desktop/Desktop/JHSPH/Capstone Melissa/R Analysis/Malaria.Maps/Sarah_A/20180627 for Equity Map") #change file path
+mozambique2015<-readOGR(dsn=path,layer=geo.name)
+
+# reformat to enable plotting
+mozambique2015@data$id <- rownames(mozambique2015@data)
+mozambique2015Points <- fortify(mozambique2015, regions = "id") # create a data.frame from our spatial object
+mozambique2015DF <- merge(mozambique2015Points, mozambique2015@data, by = "id")
+
+# DHS data with province assignment
+data <- read.csv(file="~/Desktop/Desktop/JHSPH/Capstone Melissa/R Analysis/Malaria.Maps/Sarah_A/ICF_results_graphs 27Apr2019a.csv", head=TRUE, sep=",") # change this to data with indicator of interest
+
+#data <- rename(data,c('?..province'='province'))
+data <- rename(data,c('?..province'='province'))
+head(data)
+head(mozambique2015@data)
+
+#Subset results dataset to desired year BEFORE merge to avoid many to many geopoint merges
+data1 <- subset(data, year==2018)
+data1$ADM2_NAME <- as.character(data1$District)
+head(data1)
+class(data1$ADM2_NAME)
+
+#
+
+# change Maputo to match geo file
+names <- c("Maputo Cidade","Maputo Province")
+data1$ADM2_NAME[data1$ADM1_NAME %in% names] <- "Maputo"
+
+# merge two dataframes
+AD2.join.2015 <- join(mozambique2015DF, data1, by = "ADM2_NAME")
+sort(unique(mozambique2015DF$ADM2_NAME))
+sort(unique(data1$ADM2_NAME))
+
+class(AD2.join.2015$rdt)
+
+head(AD2.join.2015)
+
+levels(AD2.join.2015$ADM2_NAME)
+
+#maps
+AD2.join.2015$rdt <- as.character(AD2.join.2015$rdt)
+head(AD2.join.2015$year)
+rdt2 <-subset(AD2.join.2015, year="2018") 
+
+
+
+
+# output map - Malaria prevalence <5 (PROVINCE)
+tiff('~/Desktop/Desktop/JHSPH/Capstone Melissa/R Analysis/Malaria.Maps/Sarah_A/Fig.Map.district.FinalITN.tiff',units="in",width=4,height=5,res=600)
+ggplot() +
+  geom_polygon(data=AD2.join.2015, aes(long, lat, group=group, fill=rdt)) + #change 'fill' for variable to color
+  scale_fill_gradient(low="green",high="green4") + #google Rcolor to change it to color you wan
+  labs(col="") +  
+  coord_equal()+
+  theme_bw()+ # set background
+  theme(axis.ticks.y = element_blank(),axis.text.y = element_blank(), # get rid of x ticks/text
+        axis.ticks.x = element_blank(),axis.text.x = element_blank(), # get rid of y ticks/text
+        axis.title.x=element_blank(), # remove x axis label
+        axis.title.y=element_blank(), # remove x axis label
+        plot.title = element_text(size=12, lineheight=.8, face="bold", vjust=1)) + # make title bold and add space
+  theme(legend.title = element_blank()) +
+  ggtitle("")
+dev.off()
